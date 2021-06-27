@@ -1,0 +1,98 @@
+---
+
+- name: Playbook for Wordpress
+  hosts: localhost
+  become: true
+  vars:
+    jail:
+      name: wp1xx
+      fbsd_version: 13.0-RELEASE
+      ip: 192.168.0.30
+      host_interface: em0
+
+    website:
+      name: wordpress
+      port: 82
+
+    database:
+      host: "localhost:/var/run/mysql/mysql.sock"
+      dbname: wordpress
+      username: wordpress
+      password: secret password
+
+    skip_create_jail: false
+
+  tasks:
+    - name: Create Jail
+      command: "bastille create {{jail.name}} {{jail.fbsd_version}} {{jail.ip}} {{jail.host_interface}}"
+      when: skip_create_jail==0
+
+    - name: Install packages
+      command: "bastille pkg {{jail.name}} install -y nginx wordpress mariadb105-server \
+                php74-mbstring php74-dom php74-openssl php74-filter php74-iconv"
+
+    - name: sysrc enable mariadb
+      command: "bastille sysrc {{jail.name}} mysql_enable='YES'"
+
+    - name: start mariadb server
+      command: "bastille service {{jail.name}} mysql-server start"
+
+    - name: "mariadb: remove anonymous users"
+      command: "bastille cmd {{jail.name}} mysql -e \"DELETE FROM mysql.user WHERE user=''\""
+
+    - name: "mariadb: Disallow root login remotely"
+      command: "bastille cmd {{jail.name}} mysql -e \"DELETE FROM mysql.global_priv WHERE user='root' AND host NOT IN ('localhost', '127.0.0.1', '::1')\""
+
+    - name: "mariadb: Drop database test"
+      command: "bastille cmd {{jail.name}} mysql -e \"DROP DATABASE IF EXISTS test\""
+
+    - name: "mariadb: Remove privileges on database test"
+      command: "bastille cmd {{jail.name}} mysql -e \"DELETE FROM mysql.db WHERE SUBSTR(db, 4) == 'test' and user=''\""
+
+
+    - name: "mariadb: create database for wordpress"
+      command: "bastille cmd {{jail.name}} mysqladmin create {{database.dbname}}"
+
+    - name: "mariadb: Create a database user for wordpress"
+      command: "bastille cmd {{jail.name}} mysql -e \"GRANT ALL PRIVILEGES ON {{database.dbname}}.* TO '{{database.username}}'@'localhost' IDENTIFIED BY '{{database.password}}'\""
+
+    - name: "mariadb: Flush privileges"
+      command: "bastille cmd {{jail.name}} mysqladmin flush-privileges"
+
+    - name: "php: create php.ini"
+      command: "bastille cmd {{jail.name}} cp /usr/local/etc/php.ini-production /usr/local/etc/php.ini"
+
+    - name: "php enable php-fpm service"
+      command: "bastille sysrc {{jail.name}} php_fpm_enable='YES'"
+
+    - name: "php start php-fpm service"
+      command: "bastille service {{jail.name}} php-fpm start"
+
+    - name: "nginx: create sites-enabled directory"
+      command: "bastille cmd {{jail.name}} mkdir /usr/local/etc/nginx/sites-enabled"
+
+    - name: "nginx: configure website"
+      template:
+        src: wordpress.conf.j2
+        dest: "/usr/local/bastille/jails/{{jail.name}}/root/usr/local/etc/nginx/sites-enabled/{{website.name}}.conf"
+
+    - name: "nginx: configure nginx.conf to include sites-enabled directory"
+      lineinfile:
+        insertbefore: "}"
+        line: "    include sites-enabled/*.conf;"
+        path: "/usr/local/bastille/jails/{{jail.name}}/root/usr/local/etc/nginx/nginx.conf"
+
+    - name: "nginx: enable nginx service"
+      command: "bastille sysrc {{jail.name}} nginx_enable='YES'"
+
+    - name: "nginx: start nginx service"
+      command: "bastille service {{jail.name}} nginx restart"
+
+    - name: "copy wordpress folder for new website"
+      command: "bastille cmd {{jail.name}} cp -R /usr/local/www/wordpress /usr/local/www/{{website.name}}"
+
+    - name: "wordpress: create wp-config.php"
+      template:
+        src: wp-config.php.j2
+        dest: "/usr/local/bastille/jails/{{jail.name}}/root/usr/local/www/{{website.name}}/wp-config.php"
+
