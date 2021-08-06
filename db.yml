@@ -1,0 +1,38 @@
+- name: Install packages database server
+  command: "bastille pkg {{jails['database'].name}} install -y mariadb105-server"
+
+- name: Set bind port for mariadb
+  lineinfile:
+    regex: "^port"
+    line: "port = {{database.port}}" 
+    path: "/usr/local/bastille/jails/{{jails['database'].name}}/root/usr/local/etc/mysql/my.cnf"
+
+- name: sysrc enable mariadb
+  command: "bastille sysrc {{jails['database'].name}} mysql_enable='YES'"
+
+- name: start mariadb server
+  command: "bastille service {{jails['database'].name}} mysql-server restart"
+
+- name: "mariadb: remove anonymous users"
+  command: "bastille cmd {{jails['database'].name}} mysql -e \"DELETE FROM mysql.user WHERE user=''\""
+
+- name: "mariadb: Disallow root login remotely"
+  command: "bastille cmd {{jails['database'].name}} mysql -e \"DELETE FROM mysql.global_priv WHERE user='root' AND host NOT IN ('localhost', '127.0.0.1', '::1')\""
+
+- name: "mariadb: Drop database test"
+  command: "bastille cmd {{jails['database'].name}} mysql -e \"DROP DATABASE IF EXISTS test\""
+
+- name: "mariadb: Remove privileges on database test"
+  command: "bastille cmd {{jails['database'].name}} mysql -e \"DELETE FROM mysql.db WHERE SUBSTR(db, 4) == 'test' and user=''\""
+
+
+- name: "mariadb: create database for wordpress"
+  command: "bastille cmd {{jails['database'].name}} mysqladmin create {{database.dbname}}"
+
+- name: "mariadb: Create a database user for wordpress"
+  command: "bastille cmd {{jails['database'].name}} mysql -e \"GRANT ALL PRIVILEGES ON {{database.dbname}}.* TO '{{database.username}}'@'{{jails['webserver'].ip}}' IDENTIFIED BY '{{database.password}}'\""
+
+- name: "mariadb: Flush privileges"
+  command: "bastille cmd {{jails['database'].name}} mysqladmin flush-privileges"
+
+

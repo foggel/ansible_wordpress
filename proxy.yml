@@ -1,0 +1,33 @@
+- name: Install packages proxy server
+  command: "bastille pkg {{jails['proxy'].name}} install -y nginx py38-certbot-nginx"
+
+- name: Enable weekly_certbot
+  lineinfile:
+    regex: "^weekly_certbot_enable="
+    line: "weekly_certbot_enable=YES"
+    path: "/usr/local/bastille/jails/{{jails['proxy'].name}}/root/etc/periodic.conf"
+    create: true
+
+- name: "create sites-enabled directory"
+  command: "bastille cmd {{jails['proxy'].name}} mkdir /usr/local/etc/nginx/sites-enabled"
+
+- name: "nginx: configure website"
+  template:
+    src: proxy.conf.j2
+    dest: "/usr/local/bastille/jails/{{jails['proxy'].name}}/root/usr/local/etc/nginx/sites-enabled/{{website.name}}.conf"
+
+
+- name: update nginx.conf to include sites-enabled
+  lineinfile:
+    insertbefore: "}"
+    line: "    include sites-enabled/*.conf;"
+    path: "/usr/local/bastille/jails/{{jails['proxy'].name}}/root/usr/local/etc/nginx/nginx.conf"
+
+- name: "nginx: enable nginx service"
+  command: "bastille sysrc {{jails['proxy'].name}} nginx_enable='YES'"
+
+- name: "nginx: start nginx service"
+  command: "bastille service {{jails['proxy'].name}} nginx restart"
+
+- name: Generate certificates
+  command: "bastille cmd {{jails['proxy'].name}} sh -c 'certbot --nginx -m {{website.email}} -n --agree-tos --domains {{website.external_hostname}}'"

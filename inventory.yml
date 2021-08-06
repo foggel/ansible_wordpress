@@ -1,0 +1,36 @@
+all:
+  vars:
+    jails:
+      webserver:
+          name: wp1xx
+          fbsd_version: 13.0-RELEASE
+          ip: 192.168.0.30
+          host_interface: em0
+
+      database:
+        name: db1xx
+        fbsd_version: 13.0-RELEASE
+        ip: 192.168.0.31
+        host_interface: em0
+
+      proxy:
+        name: proxy1xx
+        fbsd_version: 13.0-RELEASE
+        ip: 192.168.0.32
+        host_interface: em0
+
+
+    database:
+      port: 3007
+      dbname: wordpress
+      username: wordpress
+      password: secret password
+
+    website:
+      name: wordpress
+      port: 82
+      external_hostname: mysite.localhost
+      email: some@email.ad
+
+    skip_create_jail: false
+

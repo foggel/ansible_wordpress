@@ -1,0 +1,11 @@
+server {
+	server_name {{website.external_hostname}};
+	location / {
+		proxy_pass http://{{jails.webserver.ip}}:{{website.port}};
+		proxy_set_header Host $host:$server_port;
+		proxy_set_header X-Forwarded-Proto $scheme;
+		proxy_set_header X-Forwarded-Host $host;
+		proxy_set_header X-Forwarded-Port $server_port;
+		proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+	}
+}

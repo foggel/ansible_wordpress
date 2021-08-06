@@ -79,6 +79,18 @@ $table_prefix = 'wp_';
  */
 define( 'WP_DEBUG', false );
 
+if ($_SERVER['HTTP_X_FORWARDED_PROTO'] == 'https') {
+	$_SERVER['HTTPS']='on';
+	$_SERVER['SERVER_PORT']=443;
+}
+
+if ( isset($_SERVER['HTTP_X_FORWARDED_HOST'])) {
+	$_SERVER['HTTP_HOST'] = $_SERVER['HTTP_X_FORWARDED_HOST'];
+}
+
+define('WP_SITEURL', 'https://{{website.external_hostname}}');
+define('WP_HOME', 'https://{{website.external_hostname}}');
+
 /* That's all, stop editing! Happy publishing. */
 
 /** Absolute path to the WordPress directory. */

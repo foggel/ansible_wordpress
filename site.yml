@@ -3,47 +3,40 @@
 - name: Playbook for Wordpress
   hosts: localhost
   become: true
-  vars:
-    jails:
-      webserver:
-          name: wp1xx
-          fbsd_version: 13.0-RELEASE
-          ip: 192.168.0.30
-          host_interface: em0
-
-      database:
-        name: db1xx
-        fbsd_version: 13.0-RELEASE
-        ip: 192.168.0.31
-        host_interface: em0
-
-    database:
-      port: 3007
-      dbname: wordpress
-      username: wordpress
-      password: secret password
-
-    website:
-      name: wordpress
-      port: 82
-
-    skip_create_jail: false
 
   tasks:
-    - name: Stop existing jails
-      command: "bastille stop {{ item.value.name }}"
-      when: skip_create_jail==0
-      loop: "{{jails|dict2items}}"
+    - name: Find existing jails
+      become: true
+      shell: |
+        bastille list | cut -f2 -d ' ' |tail -n +2
+      register: existing_jails
 
-    - name: delete existing jails
-      command: "bastille destroy {{ item.value.name }}"
-      when: skip_create_jail==0
-      loop: "{{jails|dict2items}}"
+    - name: Find started jails
+      become: true
+      shell: |
+        jls| tr -s ' ' |cut -d ' ' -f4|tail -n +2
+      register: started_jails
+
+    - block:
+      - name: Stop existing jails
+        command: "bastille stop {{ item.value.name }}"
+        when: skip_create_jail==0 and item.value.name in started_jails.stdout_lines
+        loop: "{{jails|dict2items}}"
+        ignore_errors: true
+
+      - name: delete existing jails
+        command: "bastille destroy {{ item.value.name }}"
+        when: skip_create_jail==0 and item.value.name in existing_jails.stdout_lines
+        loop: "{{jails|dict2items}}"
 
     - name: Create Jail
       command: "bastille create {{item.value.name}} {{item.value.fbsd_version}} {{item.value.ip}} {{item.value.host_interface}}"
       when: skip_create_jail==0
       loop: "{{jails|dict2items}}"
+
+    - import_tasks: db.yml
+    - import_tasks: webserver.yml
+    - import_tasks: proxy.yml
 
     - name: Install packages on webserver
       command: "bastille pkg {{jails['webserver'].name}} install -y nginx wordpress \
@@ -122,4 +115,5 @@
       template:
         src: wp-config.php.j2
         dest: "/usr/local/bastille/jails/{{jails['webserver'].name}}/root/usr/local/www/{{website.name}}/wp-config.php"
+
 

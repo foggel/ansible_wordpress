@@ -1,0 +1,46 @@
+- name: Install packages on webserver
+  command: "bastille pkg {{jails['webserver'].name}} install -y nginx wordpress \
+            php74-mbstring php74-dom php74-openssl php74-filter php74-iconv"
+
+
+- name: "php: create php.ini"
+  command: "bastille cmd {{jails['webserver'].name}} cp /usr/local/etc/php.ini-production /usr/local/etc/php.ini"
+
+- name: "php enable php-fpm service"
+  command: "bastille sysrc {{jails['webserver'].name}} php_fpm_enable='YES'"
+
+- name: "php start php-fpm service"
+  command: "bastille service {{jails['webserver'].name}} php-fpm start"
+
+- name: "nginx: create sites-enabled directory"
+  command: "bastille cmd {{jails['webserver'].name}} mkdir /usr/local/etc/nginx/sites-enabled"
+
+- name: "nginx: configure website"
+  template:
+    src: wordpress.conf.j2
+    dest: "/usr/local/bastille/jails/{{jails['webserver'].name}}/root/usr/local/etc/nginx/sites-enabled/{{website.name}}.conf"
+
+- name: "nginx: configure nginx.conf to include sites-enabled directory"
+  lineinfile:
+    insertbefore: "}"
+    line: "    include sites-enabled/*.conf;"
+    path: "/usr/local/bastille/jails/{{jails['webserver'].name}}/root/usr/local/etc/nginx/nginx.conf"
+
+- name: "nginx: enable nginx service"
+  command: "bastille sysrc {{jails['webserver'].name}} nginx_enable='YES'"
+
+- name: "nginx: start nginx service"
+  command: "bastille service {{jails['webserver'].name}} nginx restart"
+
+- name: "copy wordpress folder for new website"
+  command: "bastille cmd {{jails['webserver'].name}} cp -R /usr/local/www/wordpress /usr/local/www/{{website.name}}"
+
+- name: "wordpress: create wp-config.php"
+  template:
+    src: wp-config.php.j2
+    dest: "/usr/local/bastille/jails/{{jails['webserver'].name}}/root/usr/local/www/{{website.name}}/wp-config.php"
+
+- name: Set owner:group on website directory
+  command: bastille cmd {{jails['webserver'].name}} chown -R www:www /usr/local/www/{{website.name}}
+
+
