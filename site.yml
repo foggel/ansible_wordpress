@@ -36,6 +36,7 @@
 
     - import_tasks: db.yml
     - import_tasks: webserver.yml
+      tags: webserver
     - import_tasks: proxy.yml
 
     - name: Install packages on webserver
@@ -44,6 +45,8 @@
 
     - name: Install packages database server
       command: "bastille pkg {{jails['database'].name}} install -y mariadb105-server"
+      register: pkg_command
+      failed_when: pkg_command.stderr != ""
 
     - name: Set bind port for mariadb
       lineinfile:
